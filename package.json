@@ -1,0 +1,9 @@
+{
+  "name": "coze-netlify-final-project",
+  "version": "1.0.0",
+  "dependencies": {
+    "@coze/api": "^1.0.0",
+    "axios": "^1.6.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
