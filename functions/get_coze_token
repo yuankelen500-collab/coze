@@ -1,9 +1,11 @@
-// 引入必要的库
-const jwt = require('jsonwebtoken');
-const axios = require('axios');
-const crypto = require('crypto');
+// /functions/get-coze-token.js
 
-// --- 您的 Coze 凭证 (已使用您最初的、正确的私钥进行修正) ---
+// --- 关键修改：将所有 require 改为 import (纯 ES Modules 语法) ---
+import jwt from 'jsonwebtoken';
+import axios from 'axios';
+import crypto from 'crypto';
+
+// --- 您的 Coze 凭证 ---
 const COZE_APP_ID = "1137064092717";
 const COZE_KEY_ID = "NFcRQQF8ZKS6DO6CvqwxDWvmFiNGlHF1D8uXdLCZTXs";
 const COZE_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
@@ -35,17 +37,22 @@ CcneHA+YcYXK6I7VG70T9O99KEvwR2wW8zQxPpA4YY/BlSQ/03M4Pf3OtRK3o1o4
 hssA5bLC1SgTTXSkci3MC44=
 -----END PRIVATE KEY-----`;
 
-
 /**
  * Cloudflare Pages 的入口函数
  * @param {object} context - 包含请求信息的上下文对象
  */
-export async function onRequestPost(context) {
-    // 设置通用的响应头
+export async function onRequest(context) {
+    if (context.request.method !== 'POST') {
+        const errorResponse = { error: 'Method Not Allowed' };
+        return new Response(JSON.stringify(errorResponse), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+
     const responseHeaders = { "Content-Type": "application/json" };
 
     try {
-        // 从请求中解析 JSON body
         const body = await context.request.json();
         const userId = body.userId;
 
@@ -62,22 +69,15 @@ export async function onRequestPost(context) {
         const headers = { kid: COZE_KEY_ID, alg: 'RS256' };
         
         const rawJwtToken = jwt.sign(payload, COZE_PRIVATE_KEY, { header: headers });
-        console.log(`[Step 1] Raw JWT generated for session_name: ${userId}`);
-
         const url = "https://api.coze.cn/api/permission/oauth2/token";
-        
         const requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${rawJwtToken}` };
         const requestData = { "duration_seconds": 3600, "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer" };
         
-        console.log(`[Step 2] Exchanging JWT for Access Token at ${url}`);
         const response = await axios.post(url, requestData, { headers: requestHeaders });
 
         const accessToken = response.data.access_token;
         if (!accessToken) { throw new Error("获取 access_token 失败"); }
-
-        console.log("[Success] Final Access Token obtained.");
         
-        // 成功时返回标准的 Response 对象
         return new Response(JSON.stringify({ token: accessToken }), {
             status: 200,
             headers: responseHeaders,
@@ -91,7 +91,6 @@ export async function onRequestPost(context) {
             details: error.message 
         };
         
-        // 失败时也返回标准的 Response 对象
         return new Response(JSON.stringify(errorResponse), {
             status: 500,
             headers: responseHeaders,
