@@ -1,8 +1,11 @@
 {
-  "name": "coze-netlify-final-project",
+  "name": "coze-final-project",
   "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm install"
+  },
   "dependencies": {
-    "@coze/api": "^1.0.0",
     "axios": "^1.6.0",
     "jsonwebtoken": "^9.0.2"
   }
