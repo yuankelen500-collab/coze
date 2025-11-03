@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "npm install"
+    "build": "echo 'Build script running...' && npm install"
   },
   "dependencies": {
     "axios": "^1.6.0",
