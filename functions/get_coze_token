@@ -1,0 +1,100 @@
+// 引入必要的库
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
+const crypto = require('crypto');
+
+// --- 您的 Coze 凭证 (已使用您最初的、正确的私钥进行修正) ---
+const COZE_APP_ID = "1137064092717";
+const COZE_KEY_ID = "NFcRQQF8ZKS6DO6CvqwxDWvmFiNGlHF1D8uXdLCZTXs";
+const COZE_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCO7qaS4AjmgmDs
+brqHGV/OAy1+ySeguCBcgKRr9YKbQc51+Oli27SUo5yA+4KL/t4M+v62DZnR0SNY
+kOo681EYF1nu8io4BiUR+OP5qSVd/8Tm2hjmfXBNEYw/dfQaFo9gvxoyChe4d2jZ
+tMCC7RjgIyR2hMCHRWwokCx1PfUUJUfPIXwzR13VYWrag/PYwJ8WUYlV38LHHSKU
+3LqLgg+KQkOkByrJ3SGOri1xgCy7j3caXQinlE+5NT3/zk+RaoLznrYxduAK19wt
+QSfXVau+wjCXukgH5D01qi/XuHsnSMknQgzZdQFJ7FH/WDgB5YfKF3Mst8UGON6i
+bseLiZHdAgMBAAECggEAAJHVVB+63I0hRo/1nY6gu4XdUcE94sp/ebiBiNsEcQrE
+5q93rqjItXbzEe7ur3dalAHdr553DuEFTqSoalSIVDVzneiVLOTJYDyPtaUFvLQr
+3FR6/1Nf3Ghffx+nOc6XnH+AFgb4RTuLAKMgL7IzBGGsRlSmt8mzcdq+DDf5zBTA
+bnP0eH5uy3t/h8lVNGiWk/Ewt8G5mpiybEvU33At2ti0UP6jR4yBwddJj6qFpQdN
+RUXTvHBDa27x2AGBntnicrKTdZtV9+H4DUlSuaHLaSWgzsY/NY6tfkQ6Wg1hdyHT
+uzcfX/TfRlVCfYDQWveFe7yKI3qLl9jiccdoiQBCQQKBgQDEDoqw1VEoRWxlEIhQ
+be3k9Cd24aggK1vavaEmfa2Txf4xOf6XD/koYbCdNuI0/a1dfOfeo4pGKXBcg1Rn
+kv3NOehw93fUuaCpB5U3HQnalEijqeGABa4r6392Fxuo6v4mUPEfTOwxKuMIksfi
+kNqVaYgjHSDFQDbhGT5THJ1T6QKBgQC6ogYC/Qb61wVHkXe6BE//ARGC0wxajPRs
+HF+tE3ayCeRzitA/QVpDtr9sZzpIKF+mk8HMc2DRA3RwCj8TKNuPIJkbGXY/cKPb
+qy9C50NYrAE9V9bWUFZca18Lade1HTrkdjbd/Go0FeM8hfGykbPdiuCWN7D/x+RN
+QM6HokkZ1QKBgQDBNXd2JvKQ1kGpI27CnGLp07akkGNIOJKP8XrDXO1XCLKlPnrn
+0eT/563OcQzhnfFghTxYCyC0XhgOA5qFa7VUrzGjSi08ZSawDPn+004nqyQerca9
+jFuFitIUxVcL03Fcvz2wU/UbyyDsDQKRA6F1xwdTW1w1J0At+tuRukxNKQKBgE22
+U5yA8ZwXVppzZxAs5YaAUmNQL++wi8JMmkY+OYlu9xJpdccxFj3l5ZVk8m7DaPi6
+w9K3JFREBQL2MUdwFuRlJXuUQZmu9HvurvJDy9YrYSTC47E/qIY5K01cWDaRIkmp
+M7WBelOP3ZwBBiBd7TBNuLC0Jd6LxHOqjZUKrTe1AoGAS6d9D6GuZ9/fVLnLJHbA
+CcneHA+YcYXK6I7VG70T9O99KEvwR2wW8zQxPpA4YY/BlSQ/03M4Pf3OtRK3o1o4
+0gDEeXsZSvUIItRbiJE96qs7fmgjUJT+dhUcZRl4lTL/B/vzzHObzevYRgef7QyV
+hssA5bLC1SgTTXSkci3MC44=
+-----END PRIVATE KEY-----`;
+
+
+/**
+ * Cloudflare Pages 的入口函数
+ * @param {object} context - 包含请求信息的上下文对象
+ */
+export async function onRequestPost(context) {
+    // 设置通用的响应头
+    const responseHeaders = { "Content-Type": "application/json" };
+
+    try {
+        // 从请求中解析 JSON body
+        const body = await context.request.json();
+        const userId = body.userId;
+
+        if (!userId) {
+            const errorResponse = { error: "请求错误, 缺少 userId" };
+            return new Response(JSON.stringify(errorResponse), { status: 400, headers: responseHeaders });
+        }
+
+        const payload = {
+            iss: COZE_APP_ID, aud: 'api.coze.cn',
+            iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600,
+            jti: crypto.randomUUID(), session_name: userId
+        };
+        const headers = { kid: COZE_KEY_ID, alg: 'RS256' };
+        
+        const rawJwtToken = jwt.sign(payload, COZE_PRIVATE_KEY, { header: headers });
+        console.log(`[Step 1] Raw JWT generated for session_name: ${userId}`);
+
+        const url = "https://api.coze.cn/api/permission/oauth2/token";
+        
+        const requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${rawJwtToken}` };
+        const requestData = { "duration_seconds": 3600, "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer" };
+        
+        console.log(`[Step 2] Exchanging JWT for Access Token at ${url}`);
+        const response = await axios.post(url, requestData, { headers: requestHeaders });
+
+        const accessToken = response.data.access_token;
+        if (!accessToken) { throw new Error("获取 access_token 失败"); }
+
+        console.log("[Success] Final Access Token obtained.");
+        
+        // 成功时返回标准的 Response 对象
+        return new Response(JSON.stringify({ token: accessToken }), {
+            status: 200,
+            headers: responseHeaders,
+        });
+
+    } catch (error) {
+        console.error("处理请求时发生致命错误:", error.response ? error.response.data : error.message);
+        
+        const errorResponse = { 
+            error: "服务器内部错误，无法获取 Token", 
+            details: error.message 
+        };
+        
+        // 失败时也返回标准的 Response 对象
+        return new Response(JSON.stringify(errorResponse), {
+            status: 500,
+            headers: responseHeaders,
+        });
+    }
+}
