@@ -1,11 +1,8 @@
-// /functions/get-coze-token.js
-
-// --- 关键修改：将所有 require 改为 import (纯 ES Modules 语法) ---
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import crypto from 'crypto';
 
-// --- 您的 Coze 凭证 ---
+// 凭证部分... (保持不变)
 const COZE_APP_ID = "1137064092717";
 const COZE_KEY_ID = "NFcRQQF8ZKS6DO6CvqwxDWvmFiNGlHF1D8uXdLCZTXs";
 const COZE_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
@@ -37,63 +34,28 @@ CcneHA+YcYXK6I7VG70T9O99KEvwR2wW8zQxPpA4YY/BlSQ/03M4Pf3OtRK3o1o4
 hssA5bLC1SgTTXSkci3MC44=
 -----END PRIVATE KEY-----`;
 
-/**
- * Cloudflare Pages 的入口函数
- * @param {object} context - 包含请求信息的上下文对象
- */
 export async function onRequest(context) {
+    // ... (函数内容保持不变，这里省略以保持简洁)
     if (context.request.method !== 'POST') {
-        const errorResponse = { error: 'Method Not Allowed' };
-        return new Response(JSON.stringify(errorResponse), {
-            status: 405,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' }});
     }
-
-    const responseHeaders = { "Content-Type": "application/json" };
-
     try {
         const body = await context.request.json();
-        const userId = body.userId;
-
+        const { userId } = body;
         if (!userId) {
-            const errorResponse = { error: "请求错误, 缺少 userId" };
-            return new Response(JSON.stringify(errorResponse), { status: 400, headers: responseHeaders });
+            return new Response(JSON.stringify({ error: "请求错误, 缺少 userId" }), { status: 400, headers: { 'Content-Type': 'application/json' }});
         }
-
-        const payload = {
-            iss: COZE_APP_ID, aud: 'api.coze.cn',
-            iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600,
-            jti: crypto.randomUUID(), session_name: userId
-        };
+        const payload = { iss: COZE_APP_ID, aud: 'api.coze.cn', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600, jti: crypto.randomUUID(), session_name: userId };
         const headers = { kid: COZE_KEY_ID, alg: 'RS256' };
-        
         const rawJwtToken = jwt.sign(payload, COZE_PRIVATE_KEY, { header: headers });
         const url = "https://api.coze.cn/api/permission/oauth2/token";
         const requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${rawJwtToken}` };
         const requestData = { "duration_seconds": 3600, "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer" };
-        
         const response = await axios.post(url, requestData, { headers: requestHeaders });
-
-        const accessToken = response.data.access_token;
+        const { access_token: accessToken } = response.data;
         if (!accessToken) { throw new Error("获取 access_token 失败"); }
-        
-        return new Response(JSON.stringify({ token: accessToken }), {
-            status: 200,
-            headers: responseHeaders,
-        });
-
+        return new Response(JSON.stringify({ token: accessToken }), { status: 200, headers: { 'Content-Type': 'application/json' }});
     } catch (error) {
-        console.error("处理请求时发生致命错误:", error.response ? error.response.data : error.message);
-        
-        const errorResponse = { 
-            error: "服务器内部错误，无法获取 Token", 
-            details: error.message 
-        };
-        
-        return new Response(JSON.stringify(errorResponse), {
-            status: 500,
-            headers: responseHeaders,
-        });
+        return new Response(JSON.stringify({ error: "服务器内部错误", details: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' }});
     }
 }
